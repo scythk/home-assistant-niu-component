@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import hashlib
 import json
+import math
 
 # from homeassistant.util import Throttle
 from time import gmtime, strftime
@@ -139,6 +140,37 @@ class NiuApi:
             return False
         return data
 
+    def gcj2wgs(lat, lng):
+        # Constants used for the conversion
+        a = 6378245.0
+        ee = 0.00669342162296594323
+
+        def transform_lat(x, y):
+            ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * (x ** 0.5)
+            ret += (20.0 * math.sin(6.0 * x * math.pi) + 20.0 * math.sin(2.0 * x * math.pi)) * 2.0 / 3.0
+            ret += (20.0 * math.sin(y * math.pi) + 40.0 * math.sin(y / 3.0 * math.pi)) * 2.0 / 3.0
+            ret += (160.0 * math.sin(y / 12.0 * math.pi) + 320 * math.sin(y * math.pi / 30.0)) * 2.0 / 3.0
+            return ret
+
+        def transform_lng(x, y):
+            ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * (x ** 0.5)
+            ret += (20.0 * math.sin(6.0 * x * math.pi) + 20.0 * math.sin(2.0 * x * math.pi)) * 2.0 / 3.0
+            ret += (20.0 * math.sin(x * math.pi) + 40.0 * math.sin(x / 3.0 * math.pi)) * 2.0 / 3.0
+            ret += (150.0 * math.sin(x / 12.0 * math.pi) + 300.0 * math.sin(x / 30.0 * math.pi)) * 2.0 / 3.0
+            return ret
+
+        dlat = transform_lat(lng - 105.0, lat - 35.0)
+        dlng = transform_lng(lng - 105.0, lat - 35.0)
+        radlat = lat / 180.0 * math.pi
+        magic = math.sin(radlat)
+        magic = 1 - ee * magic * magic
+        sqrtmagic = math.sqrt(magic)
+        dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * math.pi)
+        dlng = (dlng * 180.0) / (a / sqrtmagic * math.cos(radlat) * math.pi)
+        mglat = lat + dlat
+        mglng = lng + dlng
+        return lat * 2 - mglat, lng * 2 - mglng
+
     def getDataBat(self, id_field):
         return self.dataBat["data"]["batteries"]["compartmentA"][id_field]
 
@@ -150,6 +182,15 @@ class NiuApi:
 
     def getDataPos(self, id_field):
         return self.dataMoto["data"]["postion"][id_field]
+
+    def getDataPosWGS(self, id_field):
+        gcj_lat = self.getDataPos("lat")
+        gcj_lng = self.getDataPos("lng")
+        wgs_lat, wgs_lng = self.gcj2wgs(gcj_lat, gcj_lng)
+        if id_field == "lat":
+            return wgs_lat
+        else:
+            return wgs_lng
 
     def getDataOverall(self, id_field):
         return self.dataMotoInfo["data"][id_field]
