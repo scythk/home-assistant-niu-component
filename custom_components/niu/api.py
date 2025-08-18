@@ -202,7 +202,6 @@ class NiuApi:
             thumburl = self.dataTrackInfo["data"][0][id_field].replace(
                 "app-api.niucache.com", "app-api.niu.com"
             )
-            # return thumburl.replace("/track/thumb/", "/track/overseas/thumb/")
             return thumburl
         return self.dataTrackInfo["data"][0][id_field]
 
